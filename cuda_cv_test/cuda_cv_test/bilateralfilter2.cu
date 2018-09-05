@@ -3,7 +3,7 @@
 #include "device_launch_parameters.h"
 #include <math.h>
 
-#define DIM 32
+#define CU_BLOCK_DIM 32
 
 __host__ __device__ __forceinline__ 
 int divUp(int total, int grain)		// 向上取整除法
@@ -15,9 +15,17 @@ __host__ __device__ __forceinline__
 unsigned char saturate_cast(int v) // 转换为0~255
 {
 	unsigned char r;
-	if (v > 255){ r = 255; }
-	else if (v < 0){ r = 0; }
-	else { r = (unsigned char)v; }
+	if (v > 255)
+    { 
+        r = 255; 
+    }
+	else if (v < 0)
+    { 
+        r = 0; 
+    }
+	else { 
+        r = (unsigned char)v; 
+    }
 	return r;
 }
 
@@ -36,23 +44,26 @@ float norm_l1(const float& a)  { return fabs(a); }
 
 void CuBilateralFilter::init(int _img_width, int _img_heigth, int _img_channels)
 {
-	this->img_cols = _img_width;
-	this->img_rows = _img_heigth;
-	this->img_channels = _img_channels;
-	this->img_size = _img_width * _img_heigth * _img_channels;
-	cudaMalloc( (void**)&dev_input_img, this->img_size * sizeof(unsigned char) );
-    cudaMalloc( (void**)&dev_result_img, this->img_size * sizeof(unsigned char) );
+	this->_img_cols = _img_width;
+    this->_img_rows = _img_heigth;
+    this->_img_channels = _img_channels;
+    this->_img_size = _img_width * _img_heigth * _img_channels;
+    cudaMalloc((void**)&_dev_input_img, this->_img_size * sizeof(unsigned char));
+    cudaMalloc((void**)&_dev_result_img, this->_img_size * sizeof(unsigned char));
 }
 
 void CuBilateralFilter::release()
 {
-	cudaFree( dev_input_img );
-    cudaFree( dev_result_img );
+    cudaFree(_dev_input_img);
+    cudaFree(_dev_result_img);
 }
 
 __global__ 
 void bilateral_kernel(unsigned char *src, unsigned char *dst,
-					int cols, int rows, const int ksz, const float sigma_spatial2_inv_half, const float sigma_color2_inv_half)
+					  int cols, int rows, 
+                      const int ksz, 
+                      const float sigma_spatial2_inv_half, 
+                      const float sigma_color2_inv_half)
 {
 	int x = threadIdx.x + blockIdx.x * blockDim.x;
 	int y = threadIdx.y + blockIdx.y * blockDim.y;
@@ -63,11 +74,13 @@ void bilateral_kernel(unsigned char *src, unsigned char *dst,
 	int offset = y * cols + x;
 
 	//bgr
-	float center[3] = { src[offset], src[cols * rows + offset], src[2 * cols * rows + offset] };
-	float value[3] = { 0, 0, 0 };
-	float weight[3] = { 0, 0, 0 };
-	float sum1[3] = {0,0,0};
-	float sum2[3] = { 0, 0, 0 };
+	float center[3] = { (float)src[offset], 
+                        (float)src[cols * rows + offset],
+                        (float)src[2 * cols * rows + offset] };
+    float value[3] = { 0.f, 0.f, 0.f };
+    float weight[3] = { 0.f, 0.f, 0.f };
+    float sum1[3] = { 0.f, 0.f, 0.f };
+    float sum2[3] = { 0.f, 0.f, 0.f };
 
 	int x_tmp, y_tmp, tmp_offset;
 	float space2;
@@ -85,7 +98,9 @@ void bilateral_kernel(unsigned char *src, unsigned char *dst,
 				for (int k = 0; k < 3; k++)
 				{
 					value[k] = (float)src[tmp_offset + cols * rows * k];
-					weight[k] = expf(space2 * sigma_spatial2_inv_half + sqrtf(norm_l1(value[k] - center[k])) * sigma_color2_inv_half);
+					weight[k] = expf(space2 * sigma_spatial2_inv_half \
+                                + sqrtf(norm_l1(value[k] - center[k])) \
+                                * sigma_color2_inv_half);
 					sum1[k] = sum1[k] + weight[k] * value[k];
 					sum2[k] = sum2[k] + weight[k];
 				}
@@ -100,24 +115,36 @@ void bilateral_kernel(unsigned char *src, unsigned char *dst,
 	}
 }
 
-void CuBilateralFilter::bilateral_caller(unsigned char *host_src_img, unsigned char *host_dst_img, int kernel_size, float sigma_spatial, float sigma_color)
+void CuBilateralFilter::bilateral_caller(unsigned char *host_src_img, 
+                                         unsigned char *host_dst_img, 
+                                         int kernel_size, 
+                                         float sigma_spatial, 
+                                         float sigma_color)
 {
-	dim3 block(32, 32);
-	dim3 grid(divUp(this->img_cols, block.x), divUp(this->img_rows, block.y));
+    dim3 block(CU_BLOCK_DIM, CU_BLOCK_DIM);
+    dim3 grid(divUp(this->_img_cols, block.x), 
+              divUp(this->_img_rows, block.y));
 
 	float sigma_spatial2_inv_half = -0.5f / (sigma_spatial * sigma_spatial);
 	float sigma_color2_inv_half = -0.5f / (sigma_color * sigma_color);
 
-	cudaMemcpy(dev_input_img, host_src_img,
-			this->img_size * sizeof(unsigned char), cudaMemcpyHostToDevice );
+    cudaMemcpy(this->_dev_input_img, host_src_img,
+        this->_img_size * sizeof(unsigned char), cudaMemcpyHostToDevice);
 	
 	//cudaDeviceSynchronize();
-	bilateral_kernel << <grid, block >> >(dev_input_img, dev_result_img, this->img_cols, this->img_rows,
-								kernel_size, sigma_spatial2_inv_half, sigma_color2_inv_half);
+    bilateral_kernel << <grid, block >> >(this->_dev_input_img,
+                                          this->_dev_result_img,
+                                          this->_img_cols, 
+                                          this->_img_rows,
+				   				          kernel_size, 
+                                          sigma_spatial2_inv_half, 
+                                          sigma_color2_inv_half);
 	//cudaDeviceSynchronize();
 
-	cudaMemcpy(host_dst_img, dev_result_img,
-		this->img_size * sizeof(unsigned char), cudaMemcpyDeviceToHost);
+    cudaMemcpy(host_dst_img, 
+               this->_dev_result_img,
+               this->_img_size * sizeof(unsigned char), 
+               cudaMemcpyDeviceToHost);
 
 }
 

@@ -6,24 +6,23 @@
 
 int main()
 {
-	time_t starttime, endtime;
-	CV_Tester cv_test;
-	CuBilateralFilter cuf;
+    time_t start_time, end_time;
+    CV_Tester cv_tester;
+    CuBilateralFilter cu_tool;
 
-	cuf.init(512, 512, 3);
-	cv_test.init(512, 512);
-	cv_test.load_txt("../test_data/test.txt");
+	cu_tool.init(512, 512, 3);
 
-	starttime = clock();
-	cuf.bilateral_caller(cv_test.src_img, cv_test.dst_img, 7, 31, 31);
-	endtime = clock();
-	printf("Dev process time %d ms\n", endtime - starttime);
+    cv_tester.init(512, 512);
+    cv_tester.load_txt("../test_data/test.txt");
 
+    start_time = clock();
+    cu_tool.bilateral_caller(cv_tester.src_img, cv_tester.dst_img, 7, 31, 31);
+    end_time = clock();
+    printf("Dev process time %d ms\n", end_time - start_time);
 
-	display_image(cv_test.dst_img, 512, 512);
+    display_image(cv_tester.dst_img, 512, 512);
 
-	cv_test.release();
-	cuf.release();
-
+    cv_tester.release();
+	cu_tool.release();
 	//system("pause");
 }

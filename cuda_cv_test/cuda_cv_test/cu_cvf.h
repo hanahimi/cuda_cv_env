@@ -4,17 +4,22 @@
 class CuBilateralFilter
 {
 private:
-	int img_size;
-	unsigned char *dev_input_img;
-	unsigned char *dev_result_img;
-public:
-	int img_rows;
-	int img_cols;
-	int img_channels;
+    unsigned char *_dev_input_img;
+    unsigned char *_dev_result_img;
+    int _img_rows;
+    int _img_cols;
+    int _img_channels;
+    int _img_size;
 
-	void init(int img_width, int img_heigth, int img_channels);
-	void bilateral_caller(unsigned char *host_src_img, unsigned char *host_dst_img, int filterSize, float sigmaD, float sigmaR);
-	void release();
+public:
+
+    void init(int img_width, int img_heigth, int img_channels);
+    void bilateral_caller(unsigned char *host_src_img, 
+                          unsigned char *host_dst_img, 
+                          int kernel_size,
+                          float sigma_spatial,
+                          float sigma_color);
+    void release();
 };
 
 
