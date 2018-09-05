@@ -68,31 +68,7 @@ void bilateral_kernel(unsigned char *src, unsigned char *dst,
 	float weight[3] = { 0, 0, 0 };
 	float sum1[3] = {0,0,0};
 	float sum2[3] = { 0, 0, 0 };
-	
-#if 0
-	int tx = x - r + ksz;
-	int ty = y - r + ksz;
-	if (x - ksz / 2 >= 0 && y - ksz / 2 >= 0 && tx < cols && ty < rows)
-	{
-		for (int cy = y - r; cy < ty; cy++)
-		{
-			for (int cx = x - r; cx < tx; cx++)
-			{
-				float space2 = (x - cx)*(x - cx) + (y - cy)*(y - cy);
-				if (space2 > r2) continue;
-				int tmp_offset = cy * cols + cx;
 
-				for (int k = 0; k < 3; k++)
-				{
-					value[k] = (float)src[tmp_offset + cols * rows * k];
-					weight[k] = expf(space2 * sigma_spatial2_inv_half + sqrtf(norm_l1(value[k] - center[k])) * sigma_color2_inv_half);
-					sum1[k] = sum1[k] + weight[k] * value[k];
-					sum2[k] = sum2[k] + weight[k];
-				}
-			}
-		}
-	}
-#endif
 	int x_tmp, y_tmp, tmp_offset;
 	float space2;
 	if (x >= 0 && y >= 0 && x < cols && y < rows)
