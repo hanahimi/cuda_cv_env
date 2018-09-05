@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <string>
 #include "cu_cvf.h"
 #include "cv_adapter.h"
 #include <time.h>
